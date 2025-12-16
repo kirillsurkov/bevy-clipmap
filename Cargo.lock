@@ -364,6 +364,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-clipmap"
+version = "0.17.3"
+dependencies = [
+ "bevy",
+ "bevy-inspector-egui",
+ "bevy_flycam",
+]
+
+[[package]]
 name = "bevy-inspector-egui"
 version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1876,15 +1885,6 @@ dependencies = [
  "glob",
  "libc",
  "libloading",
-]
-
-[[package]]
-name = "client"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy-inspector-egui",
- "bevy_flycam",
 ]
 
 [[package]]
