@@ -14,13 +14,13 @@
 }
 #endif
 
-@group(2) @binding(100) var heightmap_texture: texture_2d<f32>;
-@group(2) @binding(101) var heightmap_sampler: sampler;
-@group(2) @binding(102) var color_texture: texture_2d<f32>;
-@group(2) @binding(103) var color_sampler: sampler;
-@group(2) @binding(104) var<uniform> grid_lod: u32;
-@group(2) @binding(105) var<uniform> minmax: vec2<f32>;
-@group(2) @binding(106) var<uniform> translation: vec2<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(100) var heightmap_texture: texture_2d<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(101) var heightmap_sampler: sampler;
+@group(#{MATERIAL_BIND_GROUP}) @binding(102) var color_texture: texture_2d<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(103) var color_sampler: sampler;
+@group(#{MATERIAL_BIND_GROUP}) @binding(104) var<uniform> grid_lod: u32;
+@group(#{MATERIAL_BIND_GROUP}) @binding(105) var<uniform> minmax: vec2<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(106) var<uniform> translation: vec2<f32>;
 
 fn height_bilinear(uv: vec2<f32>, lod: i32) -> f32 {
     let tex_size = vec2<f32>(textureDimensions(heightmap_texture, lod));

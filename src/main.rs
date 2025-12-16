@@ -1,10 +1,7 @@
 use bevy::{
     color::palettes::css::{FUCHSIA, WHITE},
     image::{ImageFilterMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
-    pbr::{
-        CascadeShadowConfigBuilder,
-        wireframe::{WireframeConfig, WireframePlugin},
-    },
+    pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
     render::{
         RenderPlugin,

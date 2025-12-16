@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.16.1", features = ["basis-universal"] }
-bevy-inspector-egui = "0.33.1"
-bevy_flycam = "0.16.1"
+bevy = { version = "0.17.3", features = ["basis-universal"] }
+bevy-inspector-egui = "0.35"
+bevy_flycam = "0.17.0"

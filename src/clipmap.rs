@@ -5,15 +5,13 @@ use std::{
 
 use bevy::{
     asset::RenderAssetUsages,
+    camera::primitives::Aabb,
     color::palettes::css::{BLUE, LIME, RED, TEAL},
+    mesh::{Indices, PrimitiveTopology},
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
-    render::{
-        mesh::{Indices, PrimitiveTopology},
-        primitives::Aabb,
-        render_resource::{AsBindGroup, ShaderRef},
-        view::NoFrustumCulling,
-    },
+    render::render_resource::AsBindGroup,
+    shader::ShaderRef,
 };
 
 pub struct ClipmapPlugin;
@@ -231,8 +229,8 @@ fn init_grids(
         let terrain_material = materials.add(ExtendedMaterial {
             base: StandardMaterial::default(),
             extension: GridMaterial {
-                heightmap: clipmap.heightmap.clone_weak(),
-                color: clipmap.color.clone_weak(),
+                heightmap: clipmap.heightmap.clone(),
+                color: clipmap.color.clone(),
                 lod: grid.level,
                 minmax: Vec2 {
                     x: clipmap.min,
@@ -254,7 +252,7 @@ fn init_grids(
             let offset_y = if y >= 2 { 1.0 } else { 0.0 };
 
             commands.entity(entity).with_child((
-                Mesh3d(handles.square.clone_weak()),
+                Mesh3d(handles.square.clone()),
                 MeshMaterial3d(terrain_material.clone()),
                 Transform::from_translation(Vec3::new(
                     (x - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_x,
@@ -266,17 +264,17 @@ fn init_grids(
 
         if grid.level == 0 {
             commands.entity(entity).with_child((
-                Mesh3d(handles.center.clone_weak()),
+                Mesh3d(handles.center.clone()),
                 MeshMaterial3d(terrain_material.clone()),
             ));
         } else {
             commands.entity(entity).with_child((
-                Mesh3d(handles.filler.clone_weak()),
+                Mesh3d(handles.filler.clone()),
                 MeshMaterial3d(terrain_material.clone()),
             ));
 
             commands.entity(entity).with_child((
-                Mesh3d(handles.stitch.clone_weak()),
+                Mesh3d(handles.stitch.clone()),
                 MeshMaterial3d(terrain_material.clone()),
                 Transform::from_scale(Vec3::splat(0.5)),
             ));
@@ -284,7 +282,7 @@ fn init_grids(
 
         grid.trim = commands
             .spawn((
-                Mesh3d(handles.trim.clone_weak()),
+                Mesh3d(handles.trim.clone()),
                 MeshMaterial3d(terrain_material.clone()),
             ))
             .id();
