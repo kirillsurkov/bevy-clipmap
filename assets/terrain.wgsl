@@ -40,17 +40,6 @@ fn height_bilinear(uv: vec2<f32>, lod: i32) -> f32 {
     return mix(hx0, hx1, f.y);
 }
 
-fn height_trilinear(uv: vec2<f32>, lod: f32) -> f32 {
-    let m0 = i32(floor(lod));
-    let m1 = m0 + 1;
-    let f  = lod - f32(m0);
-
-    let c0 = height_bilinear(uv, m0);
-    let c1 = height_bilinear(uv, m1);
-
-    return mix(c0, c1, f);
-}
-
 @vertex
 fn vertex(vertex: Vertex, @builtin(vertex_index) idx: u32) -> VertexOutput {
     var out: VertexOutput;
@@ -58,22 +47,11 @@ fn vertex(vertex: Vertex, @builtin(vertex_index) idx: u32) -> VertexOutput {
     out.world_position = model * vec4<f32>(vertex.position, 1.0);
 
     let texel_size = 1.0;
-    let world_size = texel_size * vec2<f32>(textureDimensions(heightmap_texture));
-
-    let square_size = 32.0;
-    let width = square_size * 4.0 - 2.0;
-    let base_scale = 1.0;
-    let blend_width = 0.1;
-    let scale = pow(2.0, f32(grid_lod)) * base_scale;
-    let uv = (out.world_position.xz - translation) / (width * scale);
-    let dist_to_edge = 1.0 - 2.0 * max(abs(uv.x), abs(uv.y));
-    let blend = smoothstep(blend_width, 0.0, dist_to_edge);
+    let texture_size = vec2<f32>(textureDimensions(heightmap_texture));
+    let world_size = texel_size * texture_size;
 
     let height_uv = out.world_position.xz / world_size + 0.5;
-    // let height = height_trilinear(height_uv, f32(grid_lod) + blend);
-    let height_0 = height_bilinear(height_uv, i32(grid_lod));
-    let height_1 = height_bilinear(height_uv, i32(grid_lod + 1));
-    let height = mix(height_0, height_1, blend);
+    let height = height_bilinear(height_uv, 0);
 
     out.world_position.y = height * (minmax.y - minmax.x) + minmax.x;
     out.position = position_world_to_clip(out.world_position.xyz);
