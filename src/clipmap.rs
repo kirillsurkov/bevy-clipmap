@@ -77,26 +77,10 @@ impl MeshBuilder {
         self.indices.extend([p1, p3, p4]);
     }
 
-    fn build(self, wireframe: bool) -> Mesh {
-        if wireframe {
-            Mesh::new(PrimitiveTopology::LineList, RenderAssetUsages::all())
-                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices)
-                .with_inserted_indices(Indices::U32(
-                    self.indices
-                        .chunks_exact(3)
-                        .flat_map(|x: &[u32]| {
-                            let p0 = x[0];
-                            let p1 = x[1];
-                            let p2 = x[2];
-                            [p0, p1, p1, p2, p2, p0]
-                        })
-                        .collect::<Vec<_>>(),
-                ))
-        } else {
-            Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
-                .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices)
-                .with_inserted_indices(Indices::U32(self.indices))
-        }
+    fn build(&self) -> Mesh {
+        Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
+            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices.clone())
+            .with_inserted_indices(Indices::U32(self.indices.clone()))
     }
 }
 
@@ -196,11 +180,11 @@ fn init_clipmaps(
             Transform::default(),
             Visibility::default(),
             Handles {
-                square: meshes.add(square.build(false)),
-                filler: meshes.add(filler.build(false)),
-                center: meshes.add(center.build(false)),
-                trim: meshes.add(trim.build(false)),
-                stitch: meshes.add(stitch.build(false)),
+                square: meshes.add(square.build()),
+                filler: meshes.add(filler.build()),
+                center: meshes.add(center.build()),
+                trim: meshes.add(trim.build()),
+                stitch: meshes.add(stitch.build()),
             },
         ));
 
@@ -237,6 +221,22 @@ fn init_grids(
                     y: clipmap.max,
                 },
                 translation: Vec2::ZERO,
+                wireframe: 0,
+            },
+        });
+
+        let terrain_material_w = materials.add(ExtendedMaterial {
+            base: StandardMaterial::default(),
+            extension: GridMaterial {
+                heightmap: clipmap.heightmap.clone(),
+                color: clipmap.color.clone(),
+                lod: grid.level,
+                minmax: Vec2 {
+                    x: clipmap.min,
+                    y: clipmap.max,
+                },
+                translation: Vec2::ZERO,
+                wireframe: 1,
             },
         });
 
@@ -251,33 +251,56 @@ fn init_grids(
             let offset_x = if x >= 2 { 1.0 } else { 0.0 };
             let offset_y = if y >= 2 { 1.0 } else { 0.0 };
 
-            commands.entity(entity).with_child((
-                Mesh3d(handles.square.clone()),
-                MeshMaterial3d(terrain_material.clone()),
-                Transform::from_translation(Vec3::new(
-                    (x - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_x,
-                    0.0,
-                    (y - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_y,
-                )),
-            ));
+            commands.entity(entity).with_children(|c| {
+                c.spawn((
+                    Mesh3d(handles.square.clone()),
+                    MeshMaterial3d(terrain_material.clone()),
+                    Transform::from_translation(Vec3::new(
+                        (x - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_x,
+                        0.0,
+                        (y - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_y,
+                    )),
+                ))
+                .with_child((
+                    Mesh3d(handles.square.clone()),
+                    MeshMaterial3d(terrain_material_w.clone()),
+                ));
+            });
         }
 
         if grid.level == 0 {
-            commands.entity(entity).with_child((
-                Mesh3d(handles.center.clone()),
-                MeshMaterial3d(terrain_material.clone()),
-            ));
+            commands.entity(entity).with_children(|c| {
+                c.spawn((
+                    Mesh3d(handles.center.clone()),
+                    MeshMaterial3d(terrain_material.clone()),
+                ))
+                .with_child((
+                    Mesh3d(handles.center.clone()),
+                    MeshMaterial3d(terrain_material_w.clone()),
+                ));
+            });
         } else {
-            commands.entity(entity).with_child((
-                Mesh3d(handles.filler.clone()),
-                MeshMaterial3d(terrain_material.clone()),
-            ));
-
-            commands.entity(entity).with_child((
-                Mesh3d(handles.stitch.clone()),
-                MeshMaterial3d(terrain_material.clone()),
-                Transform::from_scale(Vec3::splat(0.5)),
-            ));
+            commands.entity(entity).with_children(|c| {
+                c.spawn((
+                    Mesh3d(handles.filler.clone()),
+                    MeshMaterial3d(terrain_material.clone()),
+                ))
+                .with_child((
+                    Mesh3d(handles.filler.clone()),
+                    MeshMaterial3d(terrain_material_w.clone()),
+                ));
+            });
+            commands.entity(entity).with_children(|c| {
+                c.spawn((
+                    Mesh3d(handles.stitch.clone()),
+                    MeshMaterial3d(terrain_material.clone()),
+                    Transform::from_scale(Vec3::splat(0.5)),
+                ))
+                .with_child((
+                    Mesh3d(handles.stitch.clone()),
+                    MeshMaterial3d(terrain_material_w.clone()),
+                ));
+            });
         }
 
         grid.trim = commands
@@ -285,8 +308,11 @@ fn init_grids(
                 Mesh3d(handles.trim.clone()),
                 MeshMaterial3d(terrain_material.clone()),
             ))
+            .with_child((
+                Mesh3d(handles.trim.clone()),
+                MeshMaterial3d(terrain_material_w.clone()),
+            ))
             .id();
-
         commands.entity(entity).add_child(grid.trim);
     }
 }
@@ -299,9 +325,10 @@ fn update_grids(
         &MeshMaterial3d<ExtendedMaterial<StandardMaterial, GridMaterial>>,
     >,
     clipmaps: Query<&Clipmap>,
-    grids: Query<(Entity, &ClipmapGrid, &ChildOf, &Children), With<Transform>>,
+    children: Query<&Children>,
+    grids: Query<(Entity, &ClipmapGrid, &ChildOf), With<Transform>>,
 ) {
-    for (entity, grid, clipmap, children) in grids {
+    for (entity, grid, clipmap) in grids {
         let clipmap = clipmaps.get(clipmap.parent()).unwrap();
         let scale = grid.scale(clipmap.base_scale);
         let target_pos = transforms.get(clipmap.target).unwrap().translation;
@@ -309,8 +336,8 @@ fn update_grids(
         let snap_pos = snap_factor.as_vec3() * scale;
         transforms.get_mut(entity).unwrap().translation = snap_pos;
 
-        let mut trim_transform = transforms.get_mut(grid.trim).unwrap();
         let snap_mod2 = ((snap_factor.xz() % 2) + 2) % 2;
+        let mut trim_transform = transforms.get_mut(grid.trim).unwrap();
         trim_transform.translation = (1 - snap_mod2).as_vec2().extend(0.0).xzy();
         trim_transform.rotation = Quat::from_rotation_y(match snap_mod2 {
             IVec2 { x: 0, y: 0 } => 0.0,
@@ -321,14 +348,14 @@ fn update_grids(
         });
 
         let grid_pos = (snap_pos + trim_transform.translation * scale).xz();
-        for child in children {
-            let Ok(material) = terrain_material_handles.get(*child) else {
+        for child in children.iter_descendants(entity) {
+            let Ok(material) = terrain_material_handles.get(child) else {
                 continue;
             };
             let Some(material) = terrain_materials.get_mut(material) else {
                 continue;
             };
-            let Ok(mut aabb) = aabbs.get_mut(*child) else {
+            let Ok(mut aabb) = aabbs.get_mut(child) else {
                 continue;
             };
             material.extension.translation = grid_pos;
@@ -338,7 +365,22 @@ fn update_grids(
     }
 }
 
+#[repr(C)]
+#[derive(Eq, PartialEq, Hash, Copy, Clone)]
+struct WireframeKey {
+    wireframe: bool,
+}
+
+impl From<&GridMaterial> for WireframeKey {
+    fn from(material: &GridMaterial) -> Self {
+        Self {
+            wireframe: material.wireframe != 0,
+        }
+    }
+}
+
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
+#[bind_group_data(WireframeKey)]
 struct GridMaterial {
     #[texture(100)]
     #[sampler(101)]
@@ -352,6 +394,8 @@ struct GridMaterial {
     minmax: Vec2,
     #[uniform(106)]
     translation: Vec2,
+    #[uniform(107)]
+    wireframe: u32,
 }
 
 impl MaterialExtension for GridMaterial {
@@ -369,5 +413,18 @@ impl MaterialExtension for GridMaterial {
 
     fn deferred_fragment_shader() -> ShaderRef {
         "terrain.wgsl".into()
+    }
+
+    fn specialize(
+        _: &bevy::pbr::MaterialExtensionPipeline,
+        descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
+        _: &bevy::mesh::MeshVertexBufferLayoutRef,
+        key: bevy::pbr::MaterialExtensionKey<Self>,
+    ) -> std::result::Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+        if key.bind_group_data.wireframe {
+            descriptor.primitive.polygon_mode = bevy::render::render_resource::PolygonMode::Line;
+            descriptor.depth_stencil.as_mut().unwrap().bias.slope_scale = 1.0;
+        }
+        Ok(())
     }
 }

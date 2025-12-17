@@ -21,6 +21,7 @@
 @group(#{MATERIAL_BIND_GROUP}) @binding(104) var<uniform> grid_lod: u32;
 @group(#{MATERIAL_BIND_GROUP}) @binding(105) var<uniform> minmax: vec2<f32>;
 @group(#{MATERIAL_BIND_GROUP}) @binding(106) var<uniform> translation: vec2<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(107) var<uniform> wireframe: u32;
 
 fn height_bilinear(uv: vec2<f32>, lod: i32) -> f32 {
     let tex_size = vec2<f32>(textureDimensions(heightmap_texture, lod));
@@ -56,12 +57,12 @@ fn vertex(vertex: Vertex, @builtin(vertex_index) idx: u32) -> VertexOutput {
     let model = mesh_functions::get_world_from_local(vertex.instance_index);
     out.world_position = model * vec4<f32>(vertex.position, 1.0);
 
-    let texel_size = 2.0;
+    let texel_size = 1.0;
     let world_size = texel_size * vec2<f32>(textureDimensions(heightmap_texture));
 
-    let square_size = 64.0;
+    let square_size = 32.0;
     let width = square_size * 4.0 - 2.0;
-    let base_scale = 2.0;
+    let base_scale = 1.0;
     let blend_width = 0.1;
     let scale = pow(2.0, f32(grid_lod)) * base_scale;
     let uv = (out.world_position.xz - translation) / (width * scale);
@@ -85,9 +86,15 @@ fn fragment(
     in: VertexOutput,
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
+    if wireframe != 0 {
+        var out: FragmentOutput;
+        out.color = vec4(1.0);
+        return out;
+    }
+
     var in_modified = in;
 
-    let texel_size = 2.0;
+    let texel_size = 1.0;
     let texture_size = vec2<f32>(textureDimensions(heightmap_texture));
     let world_size = texture_size * texel_size;
 
@@ -104,12 +111,9 @@ fn fragment(
     in_modified.world_normal = normalize(vec3(-dh_dx, 1.0, -dh_dy));
 
     var pbr_input = pbr_input_from_standard_material(in_modified, is_front);
-    let color = smoothstep(-0.1, 0.0, textureSample(heightmap_texture, heightmap_sampler, uv).r * (minmax.y - minmax.x) + minmax.x);
-    // pbr_input.material.base_color = mix(vec4<f32>(0.0, 0.0, 0.5, 1.0), vec4<f32>(1.0, 1.0, 0.5, 1.0), f32(in.world_position.y > 0.0));//color);
-    // pbr_input.material.base_color = vec4(vec3(in.world_position.y / 2625.0), 1.0);
-    // pbr_input.material.base_color = vec4(1.0);
     pbr_input.material.perceptual_roughness = 1.0;
     pbr_input.material.base_color = textureSample(color_texture, color_sampler, uv);
+
 #ifdef PREPASS_PIPELINE
     let out = deferred_output(in_modified, pbr_input);
 #else
@@ -117,11 +121,6 @@ fn fragment(
     out.color = apply_pbr_lighting(pbr_input);
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
 #endif
-
-    // out.color = vec4(in_modified.world_normal, 1.0);
-    // out.color = vec4(textureSample(heightmap_texture, heightmap_sampler, uv).r, 0.0, 0.0, 1.0);
-
-    // out.color = pbr_input.material.base_color;
 
     return out;
 }

@@ -1,13 +1,4 @@
-use bevy::{
-    color::palettes::css::{FUCHSIA, WHITE},
-    image::{ImageFilterMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
-    pbr::wireframe::{WireframeConfig, WireframePlugin},
-    prelude::*,
-    render::{
-        RenderPlugin,
-        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
-    },
-};
+use bevy::{color::palettes::css::FUCHSIA, image::ImageLoaderSettings, prelude::*};
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
@@ -63,22 +54,16 @@ fn setup(
 
     commands.spawn((
         DirectionalLight {
-            shadows_enabled: true,
+            shadows_enabled: false,
             ..Default::default()
         },
         Transform::from_xyz(0.5, 1.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-        // CascadeShadowConfigBuilder {
-        //     first_cascade_far_bound: 0.3,
-        //     maximum_distance: 3.0,
-        //     ..default()
-        // }
-        // .build(),
     ));
 
     commands.spawn(Clipmap {
-        square_side: 64,
-        levels: 6,
-        base_scale: 2.0,
+        square_side: 32,
+        levels: 8,
+        base_scale: 1.0,
         target,
         heightmap: asset_server.load_with_settings(
             "heightmap_1024x1024.ktx2",
