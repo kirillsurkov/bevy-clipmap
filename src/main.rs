@@ -13,7 +13,7 @@ fn main() {
         .add_plugins(WorldInspectorPlugin::default())
         .add_plugins(NoCameraPlayerPlugin)
         .insert_resource(MovementSettings {
-            speed: 100.0,
+            speed: 1000.0,
             ..Default::default()
         })
         .add_plugins(ClipmapPlugin)
@@ -49,6 +49,12 @@ fn setup(
             Camera3d::default(),
             Transform::from_xyz(0.0, 150.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
             FlyCam,
+            // EnvironmentMapLight {
+            //     diffuse_map: asset_server.load("pisa_diffuse_rgb9e5_zstd.ktx2"),
+            //     specular_map: asset_server.load("pisa_specular_rgb9e5_zstd.ktx2"),
+            //     intensity: 1000.0,
+            //     ..Default::default()
+            // },
         ))
         .id();
 
@@ -61,12 +67,18 @@ fn setup(
     ));
 
     commands.spawn(Clipmap {
-        square_side: 32,
-        levels: 8,
+        square_side: 128,
+        levels: 6,
         base_scale: 1.0,
         target,
         heightmap: asset_server.load_with_settings(
             "heightmap_1024x1024.ktx2",
+            |settings: &mut ImageLoaderSettings| {
+                settings.is_srgb = false;
+            },
+        ),
+        horizon: asset_server.load_with_settings(
+            "heightmap_horizon_512x512_8.ktx2",
             |settings: &mut ImageLoaderSettings| {
                 settings.is_srgb = false;
             },

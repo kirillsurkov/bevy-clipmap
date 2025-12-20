@@ -91,6 +91,7 @@ pub struct Clipmap {
     pub base_scale: f32,
     pub target: Entity,
     pub heightmap: Handle<Image>,
+    pub horizon: Handle<Image>,
     pub color: Handle<Image>,
     pub min: f32,
     pub max: f32,
@@ -214,6 +215,7 @@ fn init_grids(
             base: StandardMaterial::default(),
             extension: GridMaterial {
                 heightmap: clipmap.heightmap.clone(),
+                horizon: clipmap.horizon.clone(),
                 color: clipmap.color.clone(),
                 lod: grid.level,
                 minmax: Vec2 {
@@ -229,6 +231,7 @@ fn init_grids(
             base: StandardMaterial::default(),
             extension: GridMaterial {
                 heightmap: clipmap.heightmap.clone(),
+                horizon: clipmap.horizon.clone(),
                 color: clipmap.color.clone(),
                 lod: grid.level,
                 minmax: Vec2 {
@@ -262,7 +265,7 @@ fn init_grids(
                     )),
                 ))
                 .with_child((
-                    Mesh3d(handles.square.clone()),
+                    // Mesh3d(handles.square.clone()),
                     MeshMaterial3d(terrain_material_w.clone()),
                 ));
             });
@@ -275,7 +278,7 @@ fn init_grids(
                     MeshMaterial3d(terrain_material.clone()),
                 ))
                 .with_child((
-                    Mesh3d(handles.center.clone()),
+                    // Mesh3d(handles.center.clone()),
                     MeshMaterial3d(terrain_material_w.clone()),
                 ));
             });
@@ -286,7 +289,7 @@ fn init_grids(
                     MeshMaterial3d(terrain_material.clone()),
                 ))
                 .with_child((
-                    Mesh3d(handles.filler.clone()),
+                    // Mesh3d(handles.filler.clone()),
                     MeshMaterial3d(terrain_material_w.clone()),
                 ));
             });
@@ -297,7 +300,7 @@ fn init_grids(
                     Transform::from_scale(Vec3::splat(0.5)),
                 ))
                 .with_child((
-                    Mesh3d(handles.stitch.clone()),
+                    // Mesh3d(handles.stitch.clone()),
                     MeshMaterial3d(terrain_material_w.clone()),
                 ));
             });
@@ -309,7 +312,7 @@ fn init_grids(
                 MeshMaterial3d(terrain_material.clone()),
             ))
             .with_child((
-                Mesh3d(handles.trim.clone()),
+                // Mesh3d(handles.trim.clone()),
                 MeshMaterial3d(terrain_material_w.clone()),
             ))
             .id();
@@ -385,16 +388,19 @@ struct GridMaterial {
     #[texture(100)]
     #[sampler(101)]
     heightmap: Handle<Image>,
-    #[texture(102)]
+    #[texture(102, dimension="2d_array")]
     #[sampler(103)]
+    horizon: Handle<Image>,
+    #[texture(104)]
+    #[sampler(105)]
     color: Handle<Image>,
-    #[uniform(104)]
-    lod: u32,
-    #[uniform(105)]
-    minmax: Vec2,
     #[uniform(106)]
-    translation: Vec2,
+    lod: u32,
     #[uniform(107)]
+    minmax: Vec2,
+    #[uniform(108)]
+    translation: Vec2,
+    #[uniform(109)]
     wireframe: u32,
 }
 
