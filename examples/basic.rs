@@ -12,9 +12,7 @@ use bevy::{
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
-use crate::clipmap::{Clipmap, ClipmapPlugin};
-
-mod clipmap;
+use bevy_clipmap::{Clipmap, ClipmapPlugin};
 
 fn main() {
     App::new()
@@ -69,7 +67,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         half_width: 128,
         levels: 7,
         base_scale: 1.0,
-        texel_size: 1.0,
+        texel_size: 8.0,
         target,
         color: asset_server.load("color_2048x2048.png"),
         heightmap: asset_server.load_with_settings(
@@ -84,7 +82,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 settings.is_srgb = false;
             },
         ),
-        horizon_coeffs: 16,
+        horizon_coeffs: 8,
         min: -1312.5,
         max: 1312.5,
         wireframe: false,

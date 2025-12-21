@@ -6,6 +6,8 @@ license = "MIT"
 description = "Render huge 3D worlds using Bevy!"
 
 [dependencies]
-bevy = { version = "0.17.3", features = ["basis-universal"] }
+bevy = "0.17.3"
+
+[dev-dependencies]
 bevy-inspector-egui = "0.35"
 bevy_flycam = "0.17.0"
