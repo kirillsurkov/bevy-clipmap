@@ -7,6 +7,7 @@ use bevy::{
     asset::RenderAssetUsages,
     camera::primitives::Aabb,
     color::palettes::css::{BLUE, LIME, RED, TEAL},
+    light::NotShadowCaster,
     mesh::{Indices, PrimitiveTopology},
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
@@ -89,12 +90,14 @@ pub struct Clipmap {
     pub square_side: u32,
     pub levels: u32,
     pub base_scale: f32,
+    pub texel_size: f32,
     pub target: Entity,
     pub heightmap: Handle<Image>,
     pub horizon: Handle<Image>,
     pub color: Handle<Image>,
     pub min: f32,
     pub max: f32,
+    pub wireframe: bool,
 }
 
 #[derive(Component)]
@@ -218,6 +221,7 @@ fn init_grids(
                 horizon: clipmap.horizon.clone(),
                 color: clipmap.color.clone(),
                 lod: grid.level,
+                texel_size: clipmap.texel_size,
                 minmax: Vec2 {
                     x: clipmap.min,
                     y: clipmap.max,
@@ -234,6 +238,7 @@ fn init_grids(
                 horizon: clipmap.horizon.clone(),
                 color: clipmap.color.clone(),
                 lod: grid.level,
+                texel_size: clipmap.texel_size,
                 minmax: Vec2 {
                     x: clipmap.min,
                     y: clipmap.max,
@@ -255,67 +260,81 @@ fn init_grids(
             let offset_y = if y >= 2 { 1.0 } else { 0.0 };
 
             commands.entity(entity).with_children(|c| {
-                c.spawn((
+                let mut e = c.spawn((
                     Mesh3d(handles.square.clone()),
                     MeshMaterial3d(terrain_material.clone()),
+                    NotShadowCaster,
                     Transform::from_translation(Vec3::new(
                         (x - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_x,
                         0.0,
                         (y - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_y,
                     )),
-                ))
-                .with_child((
-                    // Mesh3d(handles.square.clone()),
-                    MeshMaterial3d(terrain_material_w.clone()),
                 ));
+                if clipmap.wireframe {
+                    e.with_child((
+                        Mesh3d(handles.square.clone()),
+                        MeshMaterial3d(terrain_material_w.clone()),
+                    ));
+                }
             });
         }
 
         if grid.level == 0 {
             commands.entity(entity).with_children(|c| {
-                c.spawn((
+                let mut e = c.spawn((
                     Mesh3d(handles.center.clone()),
                     MeshMaterial3d(terrain_material.clone()),
-                ))
-                .with_child((
-                    // Mesh3d(handles.center.clone()),
-                    MeshMaterial3d(terrain_material_w.clone()),
+                    NotShadowCaster,
                 ));
+                if clipmap.wireframe {
+                    e.with_child((
+                        Mesh3d(handles.center.clone()),
+                        MeshMaterial3d(terrain_material_w.clone()),
+                    ));
+                }
             });
         } else {
             commands.entity(entity).with_children(|c| {
-                c.spawn((
+                let mut e = c.spawn((
                     Mesh3d(handles.filler.clone()),
                     MeshMaterial3d(terrain_material.clone()),
-                ))
-                .with_child((
-                    // Mesh3d(handles.filler.clone()),
-                    MeshMaterial3d(terrain_material_w.clone()),
+                    NotShadowCaster,
                 ));
+                if clipmap.wireframe {
+                    e.with_child((
+                        Mesh3d(handles.filler.clone()),
+                        MeshMaterial3d(terrain_material_w.clone()),
+                    ));
+                }
             });
             commands.entity(entity).with_children(|c| {
-                c.spawn((
+                let mut e = c.spawn((
                     Mesh3d(handles.stitch.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     Transform::from_scale(Vec3::splat(0.5)),
-                ))
-                .with_child((
-                    // Mesh3d(handles.stitch.clone()),
-                    MeshMaterial3d(terrain_material_w.clone()),
+                    NotShadowCaster,
                 ));
+                if clipmap.wireframe {
+                    e.with_child((
+                        Mesh3d(handles.stitch.clone()),
+                        MeshMaterial3d(terrain_material_w.clone()),
+                    ));
+                }
             });
         }
 
-        grid.trim = commands
-            .spawn((
+        let mut trim = commands.spawn((
+            Mesh3d(handles.trim.clone()),
+            MeshMaterial3d(terrain_material.clone()),
+            NotShadowCaster,
+        ));
+        if clipmap.wireframe {
+            trim.with_child((
                 Mesh3d(handles.trim.clone()),
-                MeshMaterial3d(terrain_material.clone()),
-            ))
-            .with_child((
-                // Mesh3d(handles.trim.clone()),
                 MeshMaterial3d(terrain_material_w.clone()),
-            ))
-            .id();
+            ));
+        }
+        grid.trim = trim.id();
         commands.entity(entity).add_child(grid.trim);
     }
 }
@@ -388,7 +407,7 @@ struct GridMaterial {
     #[texture(100)]
     #[sampler(101)]
     heightmap: Handle<Image>,
-    #[texture(102, dimension="2d_array")]
+    #[texture(102, dimension = "2d_array")]
     #[sampler(103)]
     horizon: Handle<Image>,
     #[texture(104)]
@@ -397,10 +416,12 @@ struct GridMaterial {
     #[uniform(106)]
     lod: u32,
     #[uniform(107)]
-    minmax: Vec2,
+    texel_size: f32,
     #[uniform(108)]
-    translation: Vec2,
+    minmax: Vec2,
     #[uniform(109)]
+    translation: Vec2,
+    #[uniform(110)]
     wireframe: u32,
 }
 

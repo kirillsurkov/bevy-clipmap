@@ -1,4 +1,11 @@
-use bevy::{color::palettes::css::FUCHSIA, image::ImageLoaderSettings, prelude::*};
+use std::f32::consts::TAU;
+
+use bevy::{
+    camera::visibility::NoFrustumCulling,
+    color::palettes::css::{FUCHSIA, ORANGE},
+    image::ImageLoaderSettings,
+    prelude::*,
+};
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
@@ -22,9 +29,6 @@ fn main() {
         .run();
 }
 
-#[derive(Component)]
-struct Player;
-
 /// set up a simple 3D scene
 fn setup(
     mut commands: Commands,
@@ -32,18 +36,6 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    let target = commands
-        .spawn((
-            Player,
-            Mesh3d(meshes.add(Sphere::new(0.5))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: FUCHSIA.into(),
-                unlit: true,
-                ..Default::default()
-            })),
-        ))
-        .id();
-
     let target = commands
         .spawn((
             Camera3d::default(),
@@ -55,21 +47,34 @@ fn setup(
             //     intensity: 1000.0,
             //     ..Default::default()
             // },
+            AmbientLight {
+                ..Default::default()
+            },
         ))
         .id();
 
-    commands.spawn((
-        DirectionalLight {
-            shadows_enabled: false,
-            ..Default::default()
-        },
-        Transform::from_xyz(0.5, 1.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+    for _ in 0..1 {
+        commands.spawn((
+            DirectionalLight {
+                shadows_enabled: true,
+                ..Default::default()
+            },
+            NoFrustumCulling,
+            Transform::default(),
+            Mesh3d(meshes.add(Sphere::new(512.0))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: ORANGE.into(),
+                unlit: true,
+                ..Default::default()
+            })),
+        ));
+    }
 
     commands.spawn(Clipmap {
-        square_side: 128,
+        square_side: 16,
         levels: 6,
-        base_scale: 1.0,
+        base_scale: 16.0,
+        texel_size: 1.0,
         target,
         heightmap: asset_server.load_with_settings(
             "heightmap_1024x1024.ktx2",
@@ -86,29 +91,16 @@ fn setup(
         color: asset_server.load("color_2048x2048.png"),
         min: -1312.5,
         max: 1312.5,
+        wireframe: false,
     });
-
-    // commands.spawn();
 }
 
-fn update(
-    player: Single<&mut Transform, With<Player>>,
-    keys: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-) {
-    let mut transform = player.into_inner();
-    let mut move_vec = Vec3::ZERO;
-    if keys.pressed(KeyCode::ArrowUp) {
-        move_vec -= Vec3::Z
+fn update(mut lights: Query<&mut Transform, With<DirectionalLight>>, time: Res<Time>) {
+    let cnt = lights.count();
+    for (i, mut transform) in lights.iter_mut().enumerate() {
+        let angle = 0.1 * time.elapsed_secs() + (TAU * i as f32 / cnt as f32);
+        *transform =
+            Transform::from_translation(Vec3::new(angle.cos() * 8192.0, angle.sin() * 8192.0, 0.0))
+                .looking_at(Vec3::ZERO, Vec3::Y);
     }
-    if keys.pressed(KeyCode::ArrowDown) {
-        move_vec += Vec3::Z
-    }
-    if keys.pressed(KeyCode::ArrowLeft) {
-        move_vec -= Vec3::X
-    }
-    if keys.pressed(KeyCode::ArrowRight) {
-        move_vec += Vec3::X
-    }
-    transform.translation += move_vec.normalize_or_zero() * time.delta_secs() * 2.0;
 }
