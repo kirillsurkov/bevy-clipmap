@@ -1,9 +1,12 @@
 use std::f32::consts::TAU;
 
 use bevy::{
-    camera::visibility::NoFrustumCulling,
-    color::palettes::css::{FUCHSIA, ORANGE},
+    camera::Exposure,
+    color::palettes::css::ALICE_BLUE,
     image::ImageLoaderSettings,
+    light::{AtmosphereEnvironmentMapLight, light_consts::lux},
+    pbr::{Atmosphere, AtmosphereSettings},
+    post_process::bloom::Bloom,
     prelude::*,
 };
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
@@ -29,51 +32,43 @@ fn main() {
         .run();
 }
 
-/// set up a simple 3D scene
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>,
-) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let target = commands
         .spawn((
             Camera3d::default(),
-            Transform::from_xyz(0.0, 150.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-            FlyCam,
-            // EnvironmentMapLight {
-            //     diffuse_map: asset_server.load("pisa_diffuse_rgb9e5_zstd.ktx2"),
-            //     specular_map: asset_server.load("pisa_specular_rgb9e5_zstd.ktx2"),
-            //     intensity: 1000.0,
-            //     ..Default::default()
-            // },
-            AmbientLight {
+            Projection::from(PerspectiveProjection {
+                fov: 90.0_f32.to_radians(),
+                ..Default::default()
+            }),
+            Bloom::default(),
+            Atmosphere::EARTH,
+            AtmosphereSettings {
+                aerial_view_lut_max_distance: 16384.0,
                 ..Default::default()
             },
+            AtmosphereEnvironmentMapLight::default(),
+            Exposure::SUNLIGHT,
+            Transform::from_xyz(0.0, 150.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+            FlyCam,
         ))
         .id();
 
-    for _ in 0..1 {
+    for _ in 0..2 {
         commands.spawn((
             DirectionalLight {
                 shadows_enabled: true,
+                illuminance: lux::RAW_SUNLIGHT,
+                color: ALICE_BLUE.into(),
                 ..Default::default()
             },
-            NoFrustumCulling,
             Transform::default(),
-            Mesh3d(meshes.add(Sphere::new(512.0))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: ORANGE.into(),
-                unlit: true,
-                ..Default::default()
-            })),
         ));
     }
 
     commands.spawn(Clipmap {
-        square_side: 16,
-        levels: 6,
-        base_scale: 16.0,
+        half_width: 128,
+        levels: 7,
+        base_scale: 1.0,
         texel_size: 1.0,
         target,
         color: asset_server.load("color_2048x2048.png"),
@@ -89,7 +84,7 @@ fn setup(
                 settings.is_srgb = false;
             },
         ),
-        horizon_coeffs: 8,
+        horizon_coeffs: 16,
         min: -1312.5,
         max: 1312.5,
         wireframe: false,
@@ -101,7 +96,7 @@ fn update(mut lights: Query<&mut Transform, With<DirectionalLight>>, time: Res<T
     for (i, mut transform) in lights.iter_mut().enumerate() {
         let angle = 0.1 * time.elapsed_secs() + (TAU * i as f32 / cnt as f32);
         *transform =
-            Transform::from_translation(Vec3::new(angle.cos() * 8192.0, angle.sin() * 8192.0, 0.0))
+            Transform::from_translation(Vec3::new(angle.cos(), angle.sin(), angle.sin() * 0.1))
                 .looking_at(Vec3::ZERO, Vec3::Y);
     }
 }

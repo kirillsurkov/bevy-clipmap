@@ -6,7 +6,6 @@ use std::{
 use bevy::{
     asset::RenderAssetUsages,
     camera::primitives::Aabb,
-    color::palettes::css::{BLUE, LIME, RED, TEAL},
     light::NotShadowCaster,
     mesh::{Indices, PrimitiveTopology},
     pbr::{ExtendedMaterial, MaterialExtension},
@@ -87,7 +86,7 @@ impl MeshBuilder {
 
 #[derive(Component)]
 pub struct Clipmap {
-    pub square_side: u32,
+    pub half_width: u32,
     pub levels: u32,
     pub base_scale: f32,
     pub texel_size: f32,
@@ -119,8 +118,11 @@ fn init_clipmaps(
     clipmaps: Query<(Entity, &Clipmap), Added<Clipmap>>,
 ) {
     for (entity, clipmap) in clipmaps {
-        let square_side = clipmap.square_side as i32 - 1;
-        let side = square_side * 4 + 1;
+        let builder_width = clipmap.half_width as i32 * 2;
+        let filler_width = 2 - clipmap.half_width as i32 % 2;
+        let square_width = (clipmap.half_width as i32 - filler_width) / 2;
+
+        println!("{filler_width} {square_width} {builder_width}");
 
         let mut square = MeshBuilder::new();
         let mut filler = MeshBuilder::new();
@@ -128,57 +130,34 @@ fn init_clipmaps(
         let mut trim = MeshBuilder::new();
         let mut stitch = MeshBuilder::new();
 
-        for xy in 0..(side + 1) * (side + 1) {
-            let x = xy % (side + 1);
-            let y = xy / (side + 1);
-            if x < square_side && y < square_side {
+        for xy in 0..builder_width.pow(2) {
+            let x = xy % builder_width;
+            let y = xy / builder_width;
+            if x < square_width && y < square_width {
                 square.add_square(x, y);
             }
-            if (x == side / 2 || y == side / 2) && x < side && y < side {
-                center.add_square(x - side / 2, y - side / 2);
-                let range = square_side..side - square_side;
+            let range = square_width * 2..square_width * 2 + filler_width;
+            if (range.contains(&x) || range.contains(&y))
+                && x < builder_width - filler_width
+                && y < builder_width - filler_width
+            {
+                center.add_square(x, y);
+                let range = square_width..builder_width - square_width - filler_width;
                 if !range.contains(&x) || !range.contains(&y) {
-                    filler.add_square(x - (side + 1) / 2 + 1, y - (side + 1) / 2 + 1);
+                    filler.add_square(x, y);
                 }
             }
-            if x == side || y == side {
-                trim.add_square(x - (side + 1) / 2, y - (side + 1) / 2);
+            if x >= builder_width - filler_width || y >= builder_width - filler_width {
+                trim.add_square(x, y);
             }
         }
 
-        for x in 0..=side {
-            stitch.add_triangle(
-                x - side / 2,
-                0 - side / 2,
-                x - side / 2 + 1,
-                0 - side / 2,
-                x - side / 2 + 2,
-                0 - side / 2,
-            );
-            stitch.add_triangle(
-                x - side / 2 + 2,
-                2 + side / 2,
-                x - side / 2 + 1,
-                2 + side / 2,
-                x - side / 2,
-                2 + side / 2,
-            );
-            stitch.add_triangle(
-                0 - side / 2,
-                x - side / 2 + 2,
-                0 - side / 2,
-                x - side / 2 + 1,
-                0 - side / 2,
-                x - side / 2,
-            );
-            stitch.add_triangle(
-                2 + side / 2,
-                x - side / 2,
-                2 + side / 2,
-                x - side / 2 + 1,
-                2 + side / 2,
-                x - side / 2 + 2,
-            );
+        for x in 0..builder_width / 2 {
+            let x = x * 2;
+            stitch.add_triangle(x, 0, x + 1, 0, x + 2, 0);
+            stitch.add_triangle(x + 2, builder_width, x + 1, builder_width, x, builder_width);
+            stitch.add_triangle(0, x + 2, 0, x + 1, 0, x);
+            stitch.add_triangle(builder_width, x, builder_width, x + 1, builder_width, x + 2);
         }
 
         commands.entity(entity).insert((
@@ -210,6 +189,10 @@ fn init_grids(
 ) {
     for (entity, mut grid, clipmap) in &mut grids {
         let (clipmap, handles) = clipmaps.get(clipmap.parent()).unwrap();
+
+        let filler_width = 2 - clipmap.half_width as i32 % 2;
+        let square_width = (clipmap.half_width as i32 - filler_width) / 2;
+
         commands.entity(entity).insert((
             Transform::from_scale(Vec3::splat(grid.scale(clipmap.base_scale))),
             Visibility::default(),
@@ -259,19 +242,19 @@ fn init_grids(
                 continue;
             }
 
-            let offset_x = if x >= 2 { 1.0 } else { 0.0 };
-            let offset_y = if y >= 2 { 1.0 } else { 0.0 };
+            let offset_x = if x >= 2 { filler_width as f32 } else { 0.0 };
+            let offset_y = if y >= 2 { filler_width as f32 } else { 0.0 };
 
             commands.entity(entity).with_children(|c| {
                 let mut e = c.spawn((
                     Mesh3d(handles.square.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     NotShadowCaster,
-                    Transform::from_translation(Vec3::new(
-                        (x - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_x,
+                    Transform::from_xyz(
+                        (x - 2) as f32 * square_width as f32 + offset_x,
                         0.0,
-                        (y - 2) as f32 * (clipmap.square_side - 1) as f32 + offset_y,
-                    )),
+                        (y - 2) as f32 * square_width as f32 + offset_y,
+                    ),
                 ));
                 if clipmap.wireframe {
                     e.with_child((
@@ -288,6 +271,11 @@ fn init_grids(
                     Mesh3d(handles.center.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     NotShadowCaster,
+                    Transform::from_xyz(
+                        -2.0 * square_width as f32,
+                        0.0,
+                        -2.0 * square_width as f32,
+                    ),
                 ));
                 if clipmap.wireframe {
                     e.with_child((
@@ -302,6 +290,11 @@ fn init_grids(
                     Mesh3d(handles.filler.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     NotShadowCaster,
+                    Transform::from_xyz(
+                        -2.0 * square_width as f32,
+                        0.0,
+                        -2.0 * square_width as f32,
+                    ),
                 ));
                 if clipmap.wireframe {
                     e.with_child((
@@ -314,8 +307,9 @@ fn init_grids(
                 let mut e = c.spawn((
                     Mesh3d(handles.stitch.clone()),
                     MeshMaterial3d(terrain_material.clone()),
-                    Transform::from_scale(Vec3::splat(0.5)),
                     NotShadowCaster,
+                    Transform::from_xyz(-square_width as f32, 0.0, -square_width as f32)
+                        .with_scale(Vec3::splat(0.5)),
                 ));
                 if clipmap.wireframe {
                     e.with_child((
@@ -330,6 +324,7 @@ fn init_grids(
             Mesh3d(handles.trim.clone()),
             MeshMaterial3d(terrain_material.clone()),
             NotShadowCaster,
+            Transform::from_xyz(-2.0 * square_width as f32, 0.0, -2.0 * square_width as f32),
         ));
         if clipmap.wireframe {
             trim.with_child((
@@ -355,7 +350,8 @@ fn update_grids(
 ) {
     for (entity, grid, clipmap) in grids {
         let clipmap = clipmaps.get(clipmap.parent()).unwrap();
-        let scale = grid.scale(clipmap.base_scale);
+        let filler_width = 2 - clipmap.half_width as i32 % 2;
+        let scale = grid.scale(clipmap.base_scale) * filler_width as f32;
         let target_pos = transforms.get(clipmap.target).unwrap().translation;
         let snap_factor = (target_pos / scale).floor().as_ivec3();
         let snap_pos = snap_factor.as_vec3() * scale;
@@ -363,7 +359,15 @@ fn update_grids(
 
         let snap_mod2 = ((snap_factor.xz() % 2) + 2) % 2;
         let mut trim_transform = transforms.get_mut(grid.trim).unwrap();
-        trim_transform.translation = (1 - snap_mod2).as_vec2().extend(0.0).xzy();
+        trim_transform.translation = {
+            let offset_0 = filler_width as f32 - clipmap.half_width as f32;
+            let offset_1 = clipmap.half_width as f32;
+            Vec3 {
+                x: if snap_mod2.x == 0 { offset_0 } else { offset_1 },
+                y: 0.0,
+                z: if snap_mod2.y == 0 { offset_0 } else { offset_1 },
+            }
+        };
         trim_transform.rotation = Quat::from_rotation_y(match snap_mod2 {
             IVec2 { x: 0, y: 0 } => 0.0,
             IVec2 { x: 0, y: 1 } => FRAC_PI_2,

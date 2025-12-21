@@ -2,18 +2,6 @@
 #import bevy_pbr::pbr_fragment::pbr_input_from_standard_material
 #import bevy_pbr::view_transformations::position_world_to_clip
 
-#ifdef PREPASS_PIPELINE
-#import bevy_pbr::{
-    prepass_io::{Vertex, FragmentOutput},
-    pbr_deferred_functions::deferred_output,
-}
-#else
-#import bevy_pbr::{
-    forward_io::{Vertex, FragmentOutput},
-    pbr_functions::{main_pass_post_lighting_processing},
-}
-#endif
-
 #import bevy_pbr::{
     pbr_types,
     pbr_bindings,
@@ -28,14 +16,16 @@
     irradiance_volume,
     mesh_types::{MESH_FLAGS_SHADOW_RECEIVER_BIT, MESH_FLAGS_TRANSMITTED_SHADOW_RECEIVER_BIT},
 }
-#import bevy_render::maths::{E, powsafe}
+#import bevy_render::maths::{E, HALF_PI, powsafe}
 
 #ifdef MESHLET_MESH_MATERIAL_PASS
 #import bevy_pbr::meshlet_visibility_buffer_resolve::VertexOutput
 #else ifdef PREPASS_PIPELINE
-#import bevy_pbr::prepass_io::VertexOutput
+#import bevy_pbr::prepass_io::{Vertex, VertexOutput, FragmentOutput}
+#import bevy_pbr::pbr_deferred_functions::deferred_output;
 #else   // PREPASS_PIPELINE
-#import bevy_pbr::forward_io::VertexOutput
+#import bevy_pbr::forward_io::{Vertex, VertexOutput, FragmentOutput}
+#import bevy_pbr::pbr_functions::main_pass_post_lighting_processing
 #endif  // PREPASS_PIPELINE
 
 #ifdef ENVIRONMENT_MAP
@@ -94,20 +84,6 @@ fn vertex(vertex: Vertex, @builtin(vertex_index) idx: u32) -> VertexOutput {
     return out;
 }
 
-fn reconstruct_horizon(uv: vec2<f32>, theta: f32) -> f32 {
-    const N = 360.0;
-
-    var horizon = textureSample(horizon_texture, horizon_sampler, uv, 0).r / N;
-    for (var i = 1u; i <= horizon_coeffs / 2; i++) {
-        let angle = f32(i) * theta;
-        let a = textureSample(horizon_texture, horizon_sampler, uv, i).r;
-        let b = textureSample(horizon_texture, horizon_sampler, uv, i + horizon_coeffs / 2).r;
-        horizon += (2.0 / N) * (a * cos(angle) - b * sin(angle));
-    }
-    horizon *= minmax.y - minmax.x;
-    return atan(horizon);
-}
-
 @fragment
 fn fragment(
     in: VertexOutput,
@@ -149,6 +125,20 @@ fn fragment(
 #endif
 
     return out;
+}
+
+fn reconstruct_horizon(uv: vec2<f32>, theta: f32) -> f32 {
+    const N = 360.0;
+
+    var horizon = textureSample(horizon_texture, horizon_sampler, uv, 0).r / N;
+    for (var i = 1u; i <= horizon_coeffs / 2; i++) {
+        let angle = f32(i) * theta;
+        let a = textureSample(horizon_texture, horizon_sampler, uv, i).r;
+        let b = textureSample(horizon_texture, horizon_sampler, uv, i + horizon_coeffs / 2).r;
+        horizon += (2.0 / N) * (a * cos(angle) - b * sin(angle));
+    }
+    horizon *= minmax.y - minmax.x;
+    return clamp(atan(horizon), 0.0, HALF_PI);
 }
 
 fn calculate_diffuse_color(
@@ -422,7 +412,7 @@ fn apply_pbr_lighting(
         let horizon_light_elev = asin(horizon_dir.y);
         let horizon_max_elev = reconstruct_horizon(horizon_uv, horizon_theta);
         let horizon_smooth = 0.3;
-        let horizon_shadow = smoothstep(horizon_max_elev - horizon_smooth, horizon_max_elev + horizon_smooth, horizon_light_elev);
+        let horizon_shadow = smoothstep(horizon_max_elev, horizon_max_elev + horizon_smooth, horizon_light_elev);
 
         var light_contrib = lighting::directional_light(i, &lighting_input, enable_diffuse);
 
