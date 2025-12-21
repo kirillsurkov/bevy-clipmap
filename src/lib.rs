@@ -84,19 +84,44 @@ impl MeshBuilder {
     }
 }
 
+/// The component defining a clipmap.
+/// https://hhoppe.com/gpugcm.pdf
 #[derive(Component)]
 pub struct Clipmap {
+    /// Half width of the grid
+    /// Stored as half because the full width must be even.
     pub half_width: u32,
+
+    /// Number of LOD levels to generate.
+    /// Each next level covers 2x area of previous one.
     pub levels: u32,
+
+    /// Base scale of the LOD square in world units.
     pub base_scale: f32,
+
+    /// Physical size of one texel in meters.
     pub texel_size: f32,
+
+    /// The entity to follow.
     pub target: Entity,
+
+    /// Color texture.
     pub color: Handle<Image>,
+
+    /// Heightmap texture.
     pub heightmap: Handle<Image>,
+
+    /// FFT-compressed horizon map texture.
     pub horizon: Handle<Image>,
+
+    /// Number of FFT coefficients.
     pub horizon_coeffs: u32,
+
+    /// Height bounds.
     pub min: f32,
     pub max: f32,
+
+    /// Enable wireframe.
     pub wireframe: bool,
 }
 
