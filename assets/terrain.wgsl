@@ -1,0 +1,127 @@
+#import bevy_pbr::pbr_fragment::pbr_input_from_standard_material
+#import bevy_pbr::mesh_functions
+#import bevy_pbr::view_transformations::position_world_to_clip
+
+#ifdef PREPASS_PIPELINE
+#import bevy_pbr::{
+    prepass_io::{Vertex, VertexOutput, FragmentOutput},
+    pbr_deferred_functions::deferred_output,
+}
+#else
+#import bevy_pbr::{
+    forward_io::{Vertex, VertexOutput, FragmentOutput},
+    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
+}
+#endif
+
+@group(2) @binding(100) var heightmap_texture: texture_2d<f32>;
+@group(2) @binding(101) var heightmap_sampler: sampler;
+@group(2) @binding(102) var color_texture: texture_2d<f32>;
+@group(2) @binding(103) var color_sampler: sampler;
+@group(2) @binding(104) var<uniform> grid_lod: u32;
+@group(2) @binding(105) var<uniform> minmax: vec2<f32>;
+@group(2) @binding(106) var<uniform> translation: vec2<f32>;
+
+fn height_bilinear(uv: vec2<f32>, lod: i32) -> f32 {
+    let tex_size = vec2<f32>(textureDimensions(heightmap_texture, lod));
+    let pos = uv * tex_size;
+    let p0 = vec2<i32>(floor(pos));
+    let f = pos - floor(pos);
+
+    let h00 = textureLoad(heightmap_texture, p0, lod).r;
+    let h10 = textureLoad(heightmap_texture, p0 + vec2(1, 0), lod).r;
+    let h01 = textureLoad(heightmap_texture, p0 + vec2(0, 1), lod).r;
+    let h11 = textureLoad(heightmap_texture, p0 + vec2(1, 1), lod).r;
+
+    let hx0 = mix(h00, h10, f.x);
+    let hx1 = mix(h01, h11, f.x);
+
+    return mix(hx0, hx1, f.y);
+}
+
+fn height_trilinear(uv: vec2<f32>, lod: f32) -> f32 {
+    let m0 = i32(floor(lod));
+    let m1 = m0 + 1;
+    let f  = lod - f32(m0);
+
+    let c0 = height_bilinear(uv, m0);
+    let c1 = height_bilinear(uv, m1);
+
+    return mix(c0, c1, f);
+}
+
+@vertex
+fn vertex(vertex: Vertex, @builtin(vertex_index) idx: u32) -> VertexOutput {
+    var out: VertexOutput;
+    let model = mesh_functions::get_world_from_local(vertex.instance_index);
+    out.world_position = model * vec4<f32>(vertex.position, 1.0);
+
+    let texel_size = 2.0;
+    let world_size = texel_size * vec2<f32>(textureDimensions(heightmap_texture));
+
+    let square_size = 64.0;
+    let width = square_size * 4.0 - 2.0;
+    let base_scale = 2.0;
+    let blend_width = 0.1;
+    let scale = pow(2.0, f32(grid_lod)) * base_scale;
+    let uv = (out.world_position.xz - translation) / (width * scale);
+    let dist_to_edge = 1.0 - 2.0 * max(abs(uv.x), abs(uv.y));
+    let blend = smoothstep(blend_width, 0.0, dist_to_edge);
+
+    let height_uv = out.world_position.xz / world_size + 0.5;
+    // let height = height_trilinear(height_uv, f32(grid_lod) + blend);
+    let height_0 = height_bilinear(height_uv, i32(grid_lod));
+    let height_1 = height_bilinear(height_uv, i32(grid_lod + 1));
+    let height = mix(height_0, height_1, blend);
+
+    out.world_position.y = height * (minmax.y - minmax.x) + minmax.x;
+    out.position = position_world_to_clip(out.world_position.xyz);
+
+    return out;
+}
+
+@fragment
+fn fragment(
+    in: VertexOutput,
+    @builtin(front_facing) is_front: bool,
+) -> FragmentOutput {
+    var in_modified = in;
+
+    let texel_size = 2.0;
+    let texture_size = vec2<f32>(textureDimensions(heightmap_texture));
+    let world_size = texture_size * texel_size;
+
+    let uv = in.world_position.xz / world_size + 0.5 / texture_size + 0.5;
+    let step = 1.0 / texture_size;
+    let h_r = textureSample(heightmap_texture, heightmap_sampler, uv + vec2(step.x, 0.0)).r;
+    let h_l = textureSample(heightmap_texture, heightmap_sampler, uv - vec2(step.x, 0.0)).r;
+    let h_t = textureSample(heightmap_texture, heightmap_sampler, uv + vec2(0.0, step.y)).r;
+    let h_b = textureSample(heightmap_texture, heightmap_sampler, uv - vec2(0.0, step.y)).r;
+
+    let scale = (minmax.y - minmax.x) / (2.0 * texel_size);
+    let dh_dx = (h_r - h_l) * scale;
+    let dh_dy = (h_t - h_b) * scale;
+    in_modified.world_normal = normalize(vec3(-dh_dx, 1.0, -dh_dy));
+
+    var pbr_input = pbr_input_from_standard_material(in_modified, is_front);
+    let color = smoothstep(-0.1, 0.0, textureSample(heightmap_texture, heightmap_sampler, uv).r * (minmax.y - minmax.x) + minmax.x);
+    // pbr_input.material.base_color = mix(vec4<f32>(0.0, 0.0, 0.5, 1.0), vec4<f32>(1.0, 1.0, 0.5, 1.0), f32(in.world_position.y > 0.0));//color);
+    // pbr_input.material.base_color = vec4(vec3(in.world_position.y / 2625.0), 1.0);
+    // pbr_input.material.base_color = vec4(1.0);
+    pbr_input.material.perceptual_roughness = 1.0;
+    pbr_input.material.base_color = textureSample(color_texture, color_sampler, uv);
+#ifdef PREPASS_PIPELINE
+    let out = deferred_output(in_modified, pbr_input);
+#else
+    var out: FragmentOutput;
+    out.color = apply_pbr_lighting(pbr_input);
+    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+#endif
+
+    // out.color = vec4(in_modified.world_normal, 1.0);
+    // out.color = vec4(textureSample(heightmap_texture, heightmap_sampler, uv).r, 0.0, 0.0, 1.0);
+
+    // out.color = pbr_input.material.base_color;
+
+    return out;
+}

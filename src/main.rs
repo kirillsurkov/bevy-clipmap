@@ -1,8 +1,17 @@
 use bevy::{
-    color::palettes::css::FUCHSIA,
-    pbr::wireframe::{WireframeConfig, WireframePlugin},
+    color::palettes::css::{FUCHSIA, WHITE},
+    image::{ImageFilterMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
+    pbr::{
+        CascadeShadowConfigBuilder,
+        wireframe::{WireframeConfig, WireframePlugin},
+    },
     prelude::*,
+    render::{
+        RenderPlugin,
+        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+    },
 };
+use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
 use crate::clipmap::{Clipmap, ClipmapPlugin};
@@ -14,12 +23,12 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(EguiPlugin::default())
         .add_plugins(WorldInspectorPlugin::default())
-        .add_plugins(WireframePlugin::default())
-        .insert_resource(WireframeConfig {
-            global: true,
+        .add_plugins(NoCameraPlayerPlugin)
+        .insert_resource(MovementSettings {
+            speed: 100.0,
             ..Default::default()
         })
-        .add_plugins(ClipmapPlugin { square_side: 9 })
+        .add_plugins(ClipmapPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, update)
         .run();
@@ -33,6 +42,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     let target = commands
         .spawn((
@@ -46,17 +56,45 @@ fn setup(
         ))
         .id();
 
+    let target = commands
+        .spawn((
+            Camera3d::default(),
+            Transform::from_xyz(0.0, 150.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+            FlyCam,
+        ))
+        .id();
+
+    commands.spawn((
+        DirectionalLight {
+            shadows_enabled: true,
+            ..Default::default()
+        },
+        Transform::from_xyz(0.5, 1.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+        // CascadeShadowConfigBuilder {
+        //     first_cascade_far_bound: 0.3,
+        //     maximum_distance: 3.0,
+        //     ..default()
+        // }
+        // .build(),
+    ));
+
     commands.spawn(Clipmap {
+        square_side: 64,
         levels: 6,
-        base_scale: 1.0,
+        base_scale: 2.0,
         target,
+        heightmap: asset_server.load_with_settings(
+            "heightmap_1024x1024.ktx2",
+            |settings: &mut ImageLoaderSettings| {
+                settings.is_srgb = false;
+            },
+        ),
+        color: asset_server.load("color_2048x2048.png"),
+        min: -1312.5,
+        max: 1312.5,
     });
 
-    // camera
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 150.0, 1.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+    // commands.spawn();
 }
 
 fn update(
@@ -66,16 +104,16 @@ fn update(
 ) {
     let mut transform = player.into_inner();
     let mut move_vec = Vec3::ZERO;
-    if keys.pressed(KeyCode::KeyW) {
+    if keys.pressed(KeyCode::ArrowUp) {
         move_vec -= Vec3::Z
     }
-    if keys.pressed(KeyCode::KeyS) {
+    if keys.pressed(KeyCode::ArrowDown) {
         move_vec += Vec3::Z
     }
-    if keys.pressed(KeyCode::KeyA) {
+    if keys.pressed(KeyCode::ArrowLeft) {
         move_vec -= Vec3::X
     }
-    if keys.pressed(KeyCode::KeyD) {
+    if keys.pressed(KeyCode::ArrowRight) {
         move_vec += Vec3::X
     }
     transform.translation += move_vec.normalize_or_zero() * time.delta_secs() * 2.0;
