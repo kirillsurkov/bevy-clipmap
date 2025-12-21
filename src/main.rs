@@ -76,6 +76,7 @@ fn setup(
         base_scale: 16.0,
         texel_size: 1.0,
         target,
+        color: asset_server.load("color_2048x2048.png"),
         heightmap: asset_server.load_with_settings(
             "heightmap_1024x1024.ktx2",
             |settings: &mut ImageLoaderSettings| {
@@ -88,7 +89,7 @@ fn setup(
                 settings.is_srgb = false;
             },
         ),
-        color: asset_server.load("color_2048x2048.png"),
+        horizon_coeffs: 8,
         min: -1312.5,
         max: 1312.5,
         wireframe: false,

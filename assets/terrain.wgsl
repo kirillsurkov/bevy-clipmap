@@ -46,17 +46,18 @@
 #import bevy_core_pipeline::tonemapping::{tone_mapping, screen_space_dither}
 #endif
 
-@group(#{MATERIAL_BIND_GROUP}) @binding(100) var heightmap_texture: texture_2d<f32>;
-@group(#{MATERIAL_BIND_GROUP}) @binding(101) var heightmap_sampler: sampler;
-@group(#{MATERIAL_BIND_GROUP}) @binding(102) var horizon_texture: texture_2d_array<f32>;
-@group(#{MATERIAL_BIND_GROUP}) @binding(103) var horizon_sampler: sampler;
-@group(#{MATERIAL_BIND_GROUP}) @binding(104) var color_texture: texture_2d<f32>;
-@group(#{MATERIAL_BIND_GROUP}) @binding(105) var color_sampler: sampler;
-@group(#{MATERIAL_BIND_GROUP}) @binding(106) var<uniform> grid_lod: u32;
-@group(#{MATERIAL_BIND_GROUP}) @binding(107) var<uniform> texel_size: f32;
-@group(#{MATERIAL_BIND_GROUP}) @binding(108) var<uniform> minmax: vec2<f32>;
-@group(#{MATERIAL_BIND_GROUP}) @binding(109) var<uniform> translation: vec2<f32>;
-@group(#{MATERIAL_BIND_GROUP}) @binding(110) var<uniform> wireframe: u32;
+@group(#{MATERIAL_BIND_GROUP}) @binding(100) var color_texture: texture_2d<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(101) var color_sampler: sampler;
+@group(#{MATERIAL_BIND_GROUP}) @binding(102) var heightmap_texture: texture_2d<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(103) var heightmap_sampler: sampler;
+@group(#{MATERIAL_BIND_GROUP}) @binding(104) var horizon_texture: texture_2d_array<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(105) var horizon_sampler: sampler;
+@group(#{MATERIAL_BIND_GROUP}) @binding(106) var<uniform> horizon_coeffs: u32;
+@group(#{MATERIAL_BIND_GROUP}) @binding(107) var<uniform> grid_lod: u32;
+@group(#{MATERIAL_BIND_GROUP}) @binding(108) var<uniform> texel_size: f32;
+@group(#{MATERIAL_BIND_GROUP}) @binding(109) var<uniform> minmax: vec2<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(110) var<uniform> translation: vec2<f32>;
+@group(#{MATERIAL_BIND_GROUP}) @binding(111) var<uniform> wireframe: u32;
 
 fn height_bilinear(uv: vec2<f32>, lod: i32) -> f32 {
     let tex_size = vec2<f32>(textureDimensions(heightmap_texture, lod));
@@ -93,15 +94,14 @@ fn vertex(vertex: Vertex, @builtin(vertex_index) idx: u32) -> VertexOutput {
     return out;
 }
 
-fn reconstruct_horizon(uv: vec2<f32>, n_coeffs: u32, theta: f32) -> f32 {
+fn reconstruct_horizon(uv: vec2<f32>, theta: f32) -> f32 {
     const N = 360.0;
-    let K = n_coeffs / 2;
 
     var horizon = textureSample(horizon_texture, horizon_sampler, uv, 0).r / N;
-    for (var i = 1u; i <= K; i++) {
+    for (var i = 1u; i <= horizon_coeffs / 2; i++) {
         let angle = f32(i) * theta;
         let a = textureSample(horizon_texture, horizon_sampler, uv, i).r;
-        let b = textureSample(horizon_texture, horizon_sampler, uv, i + K).r;
+        let b = textureSample(horizon_texture, horizon_sampler, uv, i + horizon_coeffs / 2).r;
         horizon += (2.0 / N) * (a * cos(angle) - b * sin(angle));
     }
     horizon *= minmax.y - minmax.x;
@@ -420,7 +420,7 @@ fn apply_pbr_lighting(
         let horizon_dir = (*light).direction_to_light;
         let horizon_theta = atan2(horizon_dir.z, horizon_dir.x);
         let horizon_light_elev = asin(horizon_dir.y);
-        let horizon_max_elev = reconstruct_horizon(horizon_uv, 64, horizon_theta);
+        let horizon_max_elev = reconstruct_horizon(horizon_uv, horizon_theta);
         let horizon_smooth = 0.3;
         let horizon_shadow = smoothstep(horizon_max_elev - horizon_smooth, horizon_max_elev + horizon_smooth, horizon_light_elev);
 

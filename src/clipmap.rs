@@ -92,9 +92,10 @@ pub struct Clipmap {
     pub base_scale: f32,
     pub texel_size: f32,
     pub target: Entity,
+    pub color: Handle<Image>,
     pub heightmap: Handle<Image>,
     pub horizon: Handle<Image>,
-    pub color: Handle<Image>,
+    pub horizon_coeffs: u32,
     pub min: f32,
     pub max: f32,
     pub wireframe: bool,
@@ -217,9 +218,10 @@ fn init_grids(
         let terrain_material = materials.add(ExtendedMaterial {
             base: StandardMaterial::default(),
             extension: GridMaterial {
+                color: clipmap.color.clone(),
                 heightmap: clipmap.heightmap.clone(),
                 horizon: clipmap.horizon.clone(),
-                color: clipmap.color.clone(),
+                horizon_coeffs: clipmap.horizon_coeffs,
                 lod: grid.level,
                 texel_size: clipmap.texel_size,
                 minmax: Vec2 {
@@ -234,9 +236,10 @@ fn init_grids(
         let terrain_material_w = materials.add(ExtendedMaterial {
             base: StandardMaterial::default(),
             extension: GridMaterial {
+                color: clipmap.color.clone(),
                 heightmap: clipmap.heightmap.clone(),
                 horizon: clipmap.horizon.clone(),
-                color: clipmap.color.clone(),
+                horizon_coeffs: clipmap.horizon_coeffs,
                 lod: grid.level,
                 texel_size: clipmap.texel_size,
                 minmax: Vec2 {
@@ -406,22 +409,24 @@ impl From<&GridMaterial> for WireframeKey {
 struct GridMaterial {
     #[texture(100)]
     #[sampler(101)]
-    heightmap: Handle<Image>,
-    #[texture(102, dimension = "2d_array")]
-    #[sampler(103)]
-    horizon: Handle<Image>,
-    #[texture(104)]
-    #[sampler(105)]
     color: Handle<Image>,
+    #[texture(102)]
+    #[sampler(103)]
+    heightmap: Handle<Image>,
+    #[texture(104, dimension = "2d_array")]
+    #[sampler(105)]
+    horizon: Handle<Image>,
     #[uniform(106)]
-    lod: u32,
+    horizon_coeffs: u32,
     #[uniform(107)]
-    texel_size: f32,
+    lod: u32,
     #[uniform(108)]
-    minmax: Vec2,
+    texel_size: f32,
     #[uniform(109)]
-    translation: Vec2,
+    minmax: Vec2,
     #[uniform(110)]
+    translation: Vec2,
+    #[uniform(111)]
     wireframe: u32,
 }
 
