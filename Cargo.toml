@@ -14,5 +14,4 @@ exclude = [
 bevy = "0.17.3"
 
 [dev-dependencies]
-bevy-inspector-egui = "0.35"
 bevy_flycam = "0.17.0"

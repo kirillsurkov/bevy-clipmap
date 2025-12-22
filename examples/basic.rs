@@ -10,15 +10,12 @@ use bevy::{
     prelude::*,
 };
 use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
-use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 
 use bevy_clipmap::{Clipmap, ClipmapPlugin};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(EguiPlugin::default())
-        .add_plugins(WorldInspectorPlugin::default())
         .add_plugins(NoCameraPlayerPlugin)
         .insert_resource(MovementSettings {
             speed: 1000.0,
