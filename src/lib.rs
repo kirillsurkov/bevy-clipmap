@@ -149,8 +149,6 @@ fn init_clipmaps(
         let filler_width = 2 - clipmap.half_width as i32 % 2;
         let square_width = (clipmap.half_width as i32 - filler_width) / 2;
 
-        println!("{filler_width} {square_width} {builder_width}");
-
         let mut square = MeshBuilder::new();
         let mut filler = MeshBuilder::new();
         let mut center = MeshBuilder::new();
