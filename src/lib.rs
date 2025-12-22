@@ -4,7 +4,7 @@ use std::{
 };
 
 use bevy::{
-    asset::RenderAssetUsages,
+    asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
     camera::primitives::Aabb,
     light::NotShadowCaster,
     mesh::{Indices, PrimitiveTopology},
@@ -27,6 +27,8 @@ struct Handles {
 
 impl Plugin for ClipmapPlugin {
     fn build(&self, app: &mut App) {
+        embedded_asset!(app, "terrain.wgsl");
+
         app.add_plugins(MaterialPlugin::<
             ExtendedMaterial<StandardMaterial, GridMaterial>,
         >::default())
@@ -461,19 +463,27 @@ struct GridMaterial {
 
 impl MaterialExtension for GridMaterial {
     fn vertex_shader() -> ShaderRef {
-        "terrain.wgsl".into()
+        ShaderRef::Path(
+            AssetPath::from_path_buf(embedded_path!("terrain.wgsl")).with_source("embedded"),
+        )
     }
 
     fn deferred_vertex_shader() -> ShaderRef {
-        "terrain.wgsl".into()
+        ShaderRef::Path(
+            AssetPath::from_path_buf(embedded_path!("terrain.wgsl")).with_source("embedded"),
+        )
     }
 
     fn fragment_shader() -> ShaderRef {
-        "terrain.wgsl".into()
+        ShaderRef::Path(
+            AssetPath::from_path_buf(embedded_path!("terrain.wgsl")).with_source("embedded"),
+        )
     }
 
     fn deferred_fragment_shader() -> ShaderRef {
-        "terrain.wgsl".into()
+        ShaderRef::Path(
+            AssetPath::from_path_buf(embedded_path!("terrain.wgsl")).with_source("embedded"),
+        )
     }
 
     fn specialize(
