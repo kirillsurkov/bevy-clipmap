@@ -1,6 +1,6 @@
 [package]
 name = "bevy-clipmap"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2024"
 license = "MIT"
 description = "Render huge 3D worlds using Bevy!"
