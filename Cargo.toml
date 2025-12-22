@@ -5,11 +5,7 @@ edition = "2024"
 license = "MIT"
 description = "Render huge 3D worlds using Bevy!"
 repository = "https://github.com/kirillsurkov/bevy-clipmap"
-exclude = [
-    "assets/color_2048x2048.png",
-    "assets/heightmap_1024x1024.ktx2",
-    "assets/heightmap_horizon_512x512_8.ktx2",
-]
+exclude = ["assets/*", "screenshot.png"]
 
 [dependencies]
 bevy = "0.17.3"

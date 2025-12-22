@@ -4,6 +4,8 @@
 [![Doc](https://docs.rs/bevy-clipmap/badge.svg)](https://docs.rs/bevy-clipmap)
 [![Crate](https://img.shields.io/crates/v/bevy-clipmap.svg)](https://crates.io/crates/bevy-clipmap)
 
+![Screenshot](https://raw.githubusercontent.com/kirillsurkov/bevy-clipmap/refs/heads/main/screenshot.png)
+
 ## Overview
 
 This project implements GPU-Based Geometry Clipmaps from this paper: https://hhoppe.com/gpugcm.pdf
