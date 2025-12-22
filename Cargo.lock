@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "bevy-clipmap"
-version = "0.17.3"
+version = "1.0.0"
 dependencies = [
  "bevy",
  "bevy_flycam",
