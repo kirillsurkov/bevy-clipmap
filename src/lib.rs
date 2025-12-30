@@ -413,7 +413,7 @@ fn update_grids(
                 continue;
             };
             material.extension.translation = grid_pos;
-            aabb.center.y = clipmap.min + (clipmap.max - clipmap.min) / 2.0;
+            aabb.center.y = clipmap.min + (clipmap.max - clipmap.min) / 2.0 - snap_pos.y;
             aabb.half_extents.y = (clipmap.max - clipmap.min) / 2.0;
         }
     }
