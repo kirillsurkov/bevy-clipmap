@@ -378,11 +378,11 @@ fn update_grids(
         let filler_width = 2 - clipmap.half_width as i32 % 2;
         let scale = grid.scale(clipmap.base_scale) * filler_width as f32;
         let target_pos = transforms.get(clipmap.target).unwrap().translation;
-        let snap_factor = (target_pos / scale).floor().as_ivec3();
-        let snap_pos = snap_factor.as_vec3() * scale;
-        transforms.get_mut(entity).unwrap().translation = snap_pos;
+        let snap_factor = (target_pos / scale).floor().as_ivec3().xz();
+        let snap_pos = snap_factor.as_vec2() * scale;
+        transforms.get_mut(entity).unwrap().translation = snap_pos.extend(0.0).xzy();
 
-        let snap_mod2 = ((snap_factor.xz() % 2) + 2) % 2;
+        let snap_mod2 = ((snap_factor % 2) + 2) % 2;
         let mut trim_transform = transforms.get_mut(grid.trim).unwrap();
         trim_transform.translation = {
             let offset_0 = filler_width as f32 - clipmap.half_width as f32;
@@ -401,7 +401,7 @@ fn update_grids(
             _ => unreachable!(),
         });
 
-        let grid_pos = (snap_pos + trim_transform.translation * scale).xz();
+        let grid_pos = (snap_pos.extend(0.0).xzy() + trim_transform.translation * scale).xz();
         for child in children.iter_descendants(entity) {
             let Ok(material) = terrain_material_handles.get(child) else {
                 continue;
@@ -413,7 +413,7 @@ fn update_grids(
                 continue;
             };
             material.extension.translation = grid_pos;
-            aabb.center.y = clipmap.min + (clipmap.max - clipmap.min) / 2.0 - snap_pos.y;
+            aabb.center.y = clipmap.min + (clipmap.max - clipmap.min) / 2.0;
             aabb.half_extents.y = (clipmap.max - clipmap.min) / 2.0;
         }
     }
