@@ -5,7 +5,7 @@ use std::{
 
 use bevy::{
     asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
-    camera::primitives::Aabb,
+    camera::{primitives::Aabb, visibility::NoAutoAabb},
     light::NotShadowCaster,
     mesh::{Indices, PrimitiveTopology},
     pbr::{ExtendedMaterial, MaterialExtension},
@@ -16,13 +16,33 @@ use bevy::{
 
 pub struct ClipmapPlugin;
 
+struct ClipmapPart {
+    handle: Handle<Mesh>,
+    aabb: Aabb,
+}
+
+impl ClipmapPart {
+    fn build(meshes: &mut ResMut<Assets<Mesh>>, builder: MeshBuilder) -> Self {
+        let mut min = Vec3::from_slice(&builder.vertices[0]);
+        let mut max = min;
+        for v in builder.vertices.iter().map(|v| Vec3::from_slice(v)) {
+            min = min.min(v);
+            max = max.max(v);
+        }
+        Self {
+            handle: meshes.add(builder.build()),
+            aabb: Aabb::from_min_max(min, max),
+        }
+    }
+}
+
 #[derive(Component)]
-struct Handles {
-    square: Handle<Mesh>,
-    filler: Handle<Mesh>,
-    center: Handle<Mesh>,
-    trim: Handle<Mesh>,
-    stitch: Handle<Mesh>,
+struct ClipmapParts {
+    square: ClipmapPart,
+    filler: ClipmapPart,
+    center: ClipmapPart,
+    trim: ClipmapPart,
+    stitch: ClipmapPart,
 }
 
 impl Plugin for ClipmapPlugin {
@@ -79,10 +99,10 @@ impl MeshBuilder {
         self.indices.extend([p1, p3, p4]);
     }
 
-    fn build(&self) -> Mesh {
+    fn build(self) -> Mesh {
         Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
-            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices.clone())
-            .with_inserted_indices(Indices::U32(self.indices.clone()))
+            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices)
+            .with_inserted_indices(Indices::U32(self.indices))
     }
 }
 
@@ -188,12 +208,12 @@ fn init_clipmaps(
         commands.entity(entity).insert((
             Transform::default(),
             Visibility::default(),
-            Handles {
-                square: meshes.add(square.build()),
-                filler: meshes.add(filler.build()),
-                center: meshes.add(center.build()),
-                trim: meshes.add(trim.build()),
-                stitch: meshes.add(stitch.build()),
+            ClipmapParts {
+                square: ClipmapPart::build(&mut meshes, square),
+                filler: ClipmapPart::build(&mut meshes, filler),
+                center: ClipmapPart::build(&mut meshes, center),
+                trim: ClipmapPart::build(&mut meshes, trim),
+                stitch: ClipmapPart::build(&mut meshes, stitch),
             },
         ));
 
@@ -209,11 +229,11 @@ fn init_clipmaps(
 fn init_grids(
     mut commands: Commands,
     mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, GridMaterial>>>,
-    clipmaps: Query<(&Clipmap, &Handles)>,
+    clipmaps: Query<(&Clipmap, &ClipmapParts)>,
     mut grids: Query<(Entity, &mut ClipmapGrid, &ChildOf), Added<ClipmapGrid>>,
 ) {
     for (entity, mut grid, clipmap) in &mut grids {
-        let (clipmap, handles) = clipmaps.get(clipmap.parent()).unwrap();
+        let (clipmap, parts) = clipmaps.get(clipmap.parent()).unwrap();
 
         let filler_width = 2 - clipmap.half_width as i32 % 2;
         let square_width = (clipmap.half_width as i32 - filler_width) / 2;
@@ -272,7 +292,7 @@ fn init_grids(
 
             commands.entity(entity).with_children(|c| {
                 let mut e = c.spawn((
-                    Mesh3d(handles.square.clone()),
+                    Mesh3d(parts.square.handle.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     NotShadowCaster,
                     Transform::from_xyz(
@@ -280,11 +300,15 @@ fn init_grids(
                         0.0,
                         (y - 2) as f32 * square_width as f32 + offset_y,
                     ),
+                    NoAutoAabb,
+                    parts.square.aabb.clone(),
                 ));
                 if clipmap.wireframe {
                     e.with_child((
-                        Mesh3d(handles.square.clone()),
+                        Mesh3d(parts.square.handle.clone()),
                         MeshMaterial3d(terrain_material_w.clone()),
+                        NoAutoAabb,
+                        parts.square.aabb.clone(),
                     ));
                 }
             });
@@ -293,7 +317,7 @@ fn init_grids(
         if grid.level == 0 {
             commands.entity(entity).with_children(|c| {
                 let mut e = c.spawn((
-                    Mesh3d(handles.center.clone()),
+                    Mesh3d(parts.center.handle.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     NotShadowCaster,
                     Transform::from_xyz(
@@ -301,18 +325,22 @@ fn init_grids(
                         0.0,
                         -2.0 * square_width as f32,
                     ),
+                    NoAutoAabb,
+                    parts.center.aabb,
                 ));
                 if clipmap.wireframe {
                     e.with_child((
-                        Mesh3d(handles.center.clone()),
+                        Mesh3d(parts.center.handle.clone()),
                         MeshMaterial3d(terrain_material_w.clone()),
+                        NoAutoAabb,
+                        parts.center.aabb,
                     ));
                 }
             });
         } else {
             commands.entity(entity).with_children(|c| {
                 let mut e = c.spawn((
-                    Mesh3d(handles.filler.clone()),
+                    Mesh3d(parts.filler.handle.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     NotShadowCaster,
                     Transform::from_xyz(
@@ -320,41 +348,53 @@ fn init_grids(
                         0.0,
                         -2.0 * square_width as f32,
                     ),
+                    NoAutoAabb,
+                    parts.filler.aabb,
                 ));
                 if clipmap.wireframe {
                     e.with_child((
-                        Mesh3d(handles.filler.clone()),
+                        Mesh3d(parts.filler.handle.clone()),
                         MeshMaterial3d(terrain_material_w.clone()),
+                        NoAutoAabb,
+                        parts.filler.aabb,
                     ));
                 }
             });
             commands.entity(entity).with_children(|c| {
                 let mut e = c.spawn((
-                    Mesh3d(handles.stitch.clone()),
+                    Mesh3d(parts.stitch.handle.clone()),
                     MeshMaterial3d(terrain_material.clone()),
                     NotShadowCaster,
                     Transform::from_xyz(-square_width as f32, 0.0, -square_width as f32)
                         .with_scale(Vec3::splat(0.5)),
+                    NoAutoAabb,
+                    parts.stitch.aabb,
                 ));
                 if clipmap.wireframe {
                     e.with_child((
-                        Mesh3d(handles.stitch.clone()),
+                        Mesh3d(parts.stitch.handle.clone()),
                         MeshMaterial3d(terrain_material_w.clone()),
+                        NoAutoAabb,
+                        parts.stitch.aabb,
                     ));
                 }
             });
         }
 
         let mut trim = commands.spawn((
-            Mesh3d(handles.trim.clone()),
+            Mesh3d(parts.trim.handle.clone()),
             MeshMaterial3d(terrain_material.clone()),
             NotShadowCaster,
             Transform::from_xyz(-2.0 * square_width as f32, 0.0, -2.0 * square_width as f32),
+            NoAutoAabb,
+            parts.trim.aabb,
         ));
         if clipmap.wireframe {
             trim.with_child((
-                Mesh3d(handles.trim.clone()),
+                Mesh3d(parts.trim.handle.clone()),
                 MeshMaterial3d(terrain_material_w.clone()),
+                NoAutoAabb,
+                parts.trim.aabb,
             ));
         }
         grid.trim = trim.id();
@@ -376,10 +416,10 @@ fn update_grids(
     for (entity, grid, clipmap) in grids {
         let clipmap = clipmaps.get(clipmap.parent()).unwrap();
         let filler_width = 2 - clipmap.half_width as i32 % 2;
-        let scale = grid.scale(clipmap.base_scale) * filler_width as f32;
+        let snap_scale = grid.scale(clipmap.base_scale) * filler_width as f32;
         let target_pos = transforms.get(clipmap.target).unwrap().translation;
-        let snap_factor = (target_pos / scale).floor().as_ivec3().xz();
-        let snap_pos = snap_factor.as_vec2() * scale;
+        let snap_factor = (target_pos / snap_scale).floor().as_ivec3().xz();
+        let snap_pos = snap_factor.as_vec2() * snap_scale;
         transforms.get_mut(entity).unwrap().translation = snap_pos.extend(0.0).xzy();
 
         let snap_mod2 = ((snap_factor % 2) + 2) % 2;
@@ -401,7 +441,8 @@ fn update_grids(
             _ => unreachable!(),
         });
 
-        let grid_pos = (snap_pos.extend(0.0).xzy() + trim_transform.translation * scale).xz();
+        let grid_pos = (snap_pos.extend(0.0).xzy() + trim_transform.translation * snap_scale).xz();
+        let aabb_scale = 2u32.pow(1 + grid.level) as f32;
         for child in children.iter_descendants(entity) {
             let Ok(material) = terrain_material_handles.get(child) else {
                 continue;
@@ -413,8 +454,8 @@ fn update_grids(
                 continue;
             };
             material.extension.translation = grid_pos;
-            aabb.center.y = clipmap.min + (clipmap.max - clipmap.min) / 2.0;
-            aabb.half_extents.y = (clipmap.max - clipmap.min) / 2.0;
+            aabb.center.y = (clipmap.max + clipmap.min) / aabb_scale;
+            aabb.half_extents.y = (clipmap.max - clipmap.min) / aabb_scale;
         }
     }
 }
