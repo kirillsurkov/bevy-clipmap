@@ -54,6 +54,7 @@ Warning: Horizon maps require significant disk space. It generates 360 horizon m
 
 | `bevy-clipmap` | `bevy`   |
 | :--            | :--      |
+| `1.0.4`        | `0.18.0` |
 | `1.0.3`        | `0.17.3` |
 
 ## Contributing

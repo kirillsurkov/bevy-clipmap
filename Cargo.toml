@@ -1,6 +1,6 @@
 [package]
 name = "bevy-clipmap"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2024"
 license = "MIT"
 description = "Render huge 3D worlds using Bevy!"
@@ -8,7 +8,7 @@ repository = "https://github.com/kirillsurkov/bevy-clipmap"
 exclude = ["assets/*", "screenshot.png"]
 
 [dependencies]
-bevy = "0.17.3"
+bevy = "0.18.0"
 
 [dev-dependencies]
-bevy_flycam = "0.17.0"
+bevy = { version = "0.18.0", features = ["free_camera"] }

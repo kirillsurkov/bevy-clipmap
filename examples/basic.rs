@@ -2,32 +2,32 @@ use std::f32::consts::TAU;
 
 use bevy::{
     camera::Exposure,
+    camera_controller::free_camera::{FreeCamera, FreeCameraPlugin},
     color::palettes::css::ALICE_BLUE,
     image::ImageLoaderSettings,
     light::{AtmosphereEnvironmentMapLight, light_consts::lux},
-    pbr::{Atmosphere, AtmosphereSettings},
+    pbr::{Atmosphere, AtmosphereSettings, ScatteringMedium},
     post_process::bloom::Bloom,
     prelude::*,
 };
-use bevy_flycam::{FlyCam, MovementSettings, NoCameraPlayerPlugin};
 
 use bevy_clipmap::{Clipmap, ClipmapPlugin};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(NoCameraPlayerPlugin)
-        .insert_resource(MovementSettings {
-            speed: 1000.0,
-            ..Default::default()
-        })
+        .add_plugins(FreeCameraPlugin)
         .add_plugins(ClipmapPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, update)
         .run();
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut scattering_mediums: ResMut<Assets<ScatteringMedium>>,
+) {
     let target = commands
         .spawn((
             Camera3d::default(),
@@ -36,7 +36,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..Default::default()
             }),
             Bloom::default(),
-            Atmosphere::EARTH,
+            Atmosphere::earthlike(scattering_mediums.add(ScatteringMedium::default())),
             AtmosphereSettings {
                 aerial_view_lut_max_distance: 16384.0,
                 ..Default::default()
@@ -44,7 +44,11 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             AtmosphereEnvironmentMapLight::default(),
             Exposure::SUNLIGHT,
             Transform::from_xyz(0.0, 150.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-            FlyCam,
+            FreeCamera {
+                walk_speed: 500.0,
+                run_speed: 1000.0,
+                ..Default::default()
+            },
         ))
         .id();
 
